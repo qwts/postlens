@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "PostLens — Jev for X",
+  "version": "0.1.0",
+  "description": "Analyze individual X posts with Jev, on demand.",
+  "minimum_chrome_version": "109",
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.typesafe.ai/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [{
+    "matches": ["https://x.com/*", "https://www.x.com/*"],
+    "js": ["content.js"],
+    "css": ["content.css"],
+    "run_at": "document_idle"
+  }],
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "action": { "default_title": "PostLens settings" },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'" }
+}

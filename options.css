@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; font: 15px/1.6 system-ui, sans-serif; }
+body { margin: 40px auto; max-width: 580px; padding: 0 24px; }
+h1 { font-size: 28px; }
+label { display: block; font-weight: 600; }
+input { display: block; width: 100%; box-sizing: border-box; margin: 8px 0; padding: 10px; font: inherit; }
+button { font: inherit; padding: 6px 14px; margin: 4px 8px 4px 0; cursor: pointer; }
+a { color: light-dark(#075aa5, #8bc7ff); }
+#status { min-height: 24px; font-weight: 600; }
+#key-status { font-size: 13px; }

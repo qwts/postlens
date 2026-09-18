@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PostLens settings</title>
+  <link rel="stylesheet" href="options.css">
+  <script src="options.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>PostLens</h1>
+    <p>Analyze individual X posts with Jev when you click <strong>JEV Analyze</strong>.</p>
+    <form id="settings">
+      <label for="api-key">Jev API key</label>
+      <input id="api-key" type="password" autocomplete="off" spellcheck="false" maxlength="4096" required aria-describedby="key-status">
+      <p id="key-status">Checking saved key…</p>
+      <button type="submit">Save key</button>
+      <button type="button" id="remove-key">Remove key</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <p>Get your key from the <a href="https://console.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe dashboard</a>. The saved key is never displayed here.</p>
+    <p>On each analysis, visible post text and available author/metadata are sent to TypeSafe. Images, videos, linked pages, and profile pages are not fetched.</p>
+    <p><code>chrome.storage.local</code> is not a secure credential vault. This storage is acceptable for a personal prototype; do not distribute a shared API key with this extension.</p>
+    <p>Analysis results are kept locally (up to 500 posts). Clearing them means a future Analyze click can incur another API call. Stop any running analyses before clearing.</p>
+    <button type="button" id="clear-cache">Clear saved analyses</button>
+  </main>
+</body>
+</html>

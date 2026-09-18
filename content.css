@@ -1,0 +1,33 @@
+.postlens {
+  font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: inherit;
+  margin: 8px 0 2px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  cursor: default;
+}
+.postlens .postlens-toolbar { display: flex; gap: 10px; align-items: center; }
+.postlens button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #82919d66;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.postlens button:hover { background: #82919d22; }
+.postlens button:focus-visible, .postlens summary:focus-visible { outline: 2px solid #1d9bf0; outline-offset: 3px; }
+.postlens button:disabled { opacity: .55; cursor: default; }
+.postlens button[hidden] { display: none; }
+.postlens .postlens-settings { border: 0; opacity: .7; padding: 3px 0; }
+.postlens .postlens-output { overflow-wrap: anywhere; }
+.postlens .postlens-result { margin-top: 5px; padding: 8px 10px; border: 1px solid #82919d44; border-radius: 10px; }
+.postlens summary { font-weight: 600; cursor: pointer; }
+.postlens .postlens-scores { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; margin: 8px 0; }
+.postlens dt, .postlens dd { margin: 0; }
+.postlens dd { font-variant-numeric: tabular-nums; }
+.postlens .postlens-confidence { opacity: .7; font-size: 11px; }
+.postlens .postlens-type { margin: 6px 0; }
+.postlens .postlens-note { margin: 6px 0 0; font-size: 11px; opacity: .75; }
