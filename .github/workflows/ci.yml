@@ -27,7 +27,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: node --input-type=module -e 'import fs from "node:fs"; if (process.env.RELEASE_TAG !== `v${JSON.parse(fs.readFileSync("manifest.json")).version}`) process.exit(1)'
+        run: node --input-type=module -e 'import fs from "node:fs"; const m = JSON.parse(fs.readFileSync("manifest.json")); if (process.env.RELEASE_TAG !== `v${m.version_name || m.version}`) process.exit(1)'
       - run: npm run package
       - uses: actions/upload-artifact@v7.0.1
         with:
@@ -50,4 +50,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" dist/* --verify-tag --generate-notes --title "PostLens $RELEASE_TAG"
+        run: |
+          # A bot may already have published this tested build via the API.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --generate-notes --title "PostLens $RELEASE_TAG" "${flags[@]}"

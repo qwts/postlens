@@ -75,9 +75,9 @@ npm run package
 
 Node 22+ and Python 3 are needed for development/packaging. Playwright is development-only. Unit tests exercise request/auth handling, storage restrictions, cache behavior, validation, and retries. Browser tests load the actual MV3 extension into Chromium, exercising Options, isolated content scripts, Chrome messaging/storage, extraction, inline output, SPA reuse, and errors with a mocked Jev response. They spend no API credits. A real key and signed-in X session are still needed for live acceptance testing.
 
-Packaging writes `dist/postlens-0.1.0.zip` plus its SHA-256 checksum. The ZIP uses an explicit runtime-file allowlist, excludes development files and credentials, and has stable file timestamps. Unzip before using Load unpacked.
+Packaging writes `dist/postlens-0.1.0-alpha.1.zip` plus its SHA-256 checksum. The ZIP uses an explicit runtime-file allowlist, excludes development files and credentials, and has stable file timestamps. Unzip before using Load unpacked.
 
-GitHub Actions runs validation and browser tests on `main` pushes, pull requests, and manual dispatch, then uploads an installable ZIP/checksum artifact. Pushing a `v*` tag also creates a GitHub release with those assets **only after checks pass**. The tag must match the version in both `manifest.json` and `package.json` (for example `v0.1.0`). No Jev secret is required in CI. This creates GitHub releases; Chrome Web Store publication is separate.
+GitHub Actions runs validation and browser tests on `main` pushes, pull requests, and manual dispatch, then uploads an installable ZIP/checksum artifact. Pushing a `v*` tag also creates a GitHub release with those assets **only after checks pass**. Tags match `manifest.json`'s `version_name` when present (for example `v0.1.0-alpha.1`), otherwise its numeric `version`. Chrome's numeric version stays aligned with `package.json`. Alpha/beta/rc tags are marked as GitHub pre-releases; an existing release is preserved. No Jev secret is required in CI. This creates GitHub releases; Chrome Web Store publication is separate.
 
 The repository origin is `https://github.com/qwts/postlens.git`. Use the configured `qwts-codex-agent` / `agent-bot` identity for GitHub authentication and signed commits.
 

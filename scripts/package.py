@@ -7,7 +7,8 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ["manifest.json", "background.js", "questions.js", "content.js", "content.css",
          "options.html", "options.js", "options.css", "README.md"]
-version = json.loads((ROOT / "manifest.json").read_text())["version"]
+manifest = json.loads((ROOT / "manifest.json").read_text())
+version = manifest.get("version_name", manifest["version"])
 output = ROOT / "dist"
 output.mkdir(exist_ok=True)
 archive = output / f"postlens-{version}.zip"

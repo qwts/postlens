@@ -5,6 +5,10 @@ const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 assert.equal(manifest.manifest_version, 3);
 assert.equal(manifest.version, pkg.version);
+if (manifest.version_name) {
+  assert.ok(manifest.version_name.startsWith(`${manifest.version}-`));
+  assert.match(manifest.version_name, /^\d+\.\d+\.\d+-(alpha|beta|rc)\.\d+$/);
+}
 assert.deepEqual(manifest.permissions, ["storage"]);
 for (const file of [manifest.background.service_worker, manifest.options_ui.page,
   ...manifest.content_scripts.flatMap(script => [...script.js, ...script.css])]) assert.ok(existsSync(file), file);
