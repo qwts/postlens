@@ -31,3 +31,8 @@
 .postlens .postlens-confidence { opacity: .7; font-size: 11px; }
 .postlens .postlens-type { margin: 6px 0; }
 .postlens .postlens-note { margin: 6px 0 0; font-size: 11px; opacity: .75; }
+.postlens .postlens-advice { margin-top: 10px; padding-top: 10px; border-top: 1px solid #82919d44; }
+.postlens .postlens-advice p { margin: 6px 0; }
+.postlens .postlens-suggestion { font-weight: 600; }
+.postlens .postlens-context { margin: 8px 0; }
+.postlens .postlens-profile { color: inherit; text-decoration: underline; }

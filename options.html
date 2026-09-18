@@ -18,11 +18,27 @@
       <button type="submit">Save key</button>
       <button type="button" id="remove-key">Remove key</button>
     </form>
+    <h2>Timeline goal</h2>
+    <form id="timeline-settings">
+      <label for="timeline-goal">What do you want your timeline to help you do?</label>
+      <textarea id="timeline-goal" maxlength="1000" rows="4" placeholder="Learn practical AI engineering, see original research and thoughtful disagreement, and avoid promotional giveaways."></textarea>
+      <label class="checkbox"><input id="timeline-enabled" type="checkbox"> Add goal advice when I analyze a post</label>
+      <p>Requires your own OpenAI key and Jev key. GPT-5.6 Luna interprets the visible post; Jev evaluates its fit with your goal. Your goal and the post are sent to both providers. This adds up to two API calls per uncached suggestion.</p>
+      <button type="submit">Save timeline goal</button>
+    </form>
+    <form id="openai-settings">
+      <label for="openai-key">OpenAI API key (optional)</label>
+      <input id="openai-key" type="password" autocomplete="off" spellcheck="false" maxlength="4096" required aria-describedby="openai-key-status">
+      <p id="openai-key-status">Checking saved key…</p>
+      <button type="submit">Save OpenAI key</button>
+      <button type="button" id="remove-openai-key">Remove OpenAI key</button>
+    </form>
+    <p>Advice suggests Skip, Like, Like + follow, Consider mute, or Review. You make the decision using X's own controls; PostLens does not click like, follow, or mute for you. One post cannot establish an account's overall quality, and no action guarantees a ranking change.</p>
     <p id="status" role="status" aria-live="polite"></p>
-    <p>Get your key from the <a href="https://console.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe dashboard</a>. The saved key is never displayed here.</p>
+    <p>Get keys from the <a href="https://console.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe dashboard</a> and <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">OpenAI API dashboard</a>. Saved keys are never displayed here. OpenAI API billing is separate from a ChatGPT subscription.</p>
     <p>On each analysis, visible post text and available author/metadata are sent to TypeSafe. Images, videos, linked pages, and profile pages are not fetched.</p>
     <p><code>chrome.storage.local</code> is not a secure credential vault. This storage is acceptable for a personal prototype; do not distribute a shared API key with this extension.</p>
-    <p>Analysis results are kept locally (up to 500 posts). Clearing them means a future Analyze click can incur another API call. Stop any running analyses before clearing.</p>
+    <p>Analysis results and generated context are kept locally (up to 500 entries). Changing your goal uses a separate advice cache. After updating settings, refresh X to remove old suggestions. Clearing results means a future Analyze click can incur another API call. Stop any running analyses before clearing.</p>
     <button type="button" id="clear-cache">Clear saved analyses</button>
   </main>
 </body>

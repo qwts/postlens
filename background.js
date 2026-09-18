@@ -1,4 +1,5 @@
 import { QUESTIONS } from "./questions.js";
+import { OPENAI_ENDPOINT, OPENAI_MODEL, GUIDANCE_VERSION, GOAL_QUESTIONS, contextRequest, parseContext, normalizeAdvice, validateAdvice } from "./guidance.js";
 
 // Endpoint is deliberately code-owned: page messages cannot redirect credentials.
 export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -9,6 +10,7 @@ const MAX_CACHE_ENTRIES = 500;
 const pending = new Map();
 let cacheWrites = Promise.resolve();
 let retryAfter = 0;
+let openaiRetryAfter = 0;
 
 // Must finish before reading/writing any credentials; fail closed on failure.
 const storageReady = chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
@@ -47,8 +49,8 @@ export async function cacheKey(state) {
   return `${CACHE_PREFIX}hash:${Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// Only typed values needed by the UI cross the content-script boundary. Never
-// forward arbitrary response strings or error bodies (which could echo secrets).
+// Only typed post scores cross this boundary. Generated goal context uses a
+// separate bounded schema; raw response envelopes and error bodies never cross.
 export function normalizeAnswers(body) {
   const answers = {};
   const validNumber = (n, max) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= max;
@@ -86,38 +88,45 @@ async function saveCache(key, result) {
   return write;
 }
 
-async function analyze(state, key) {
-  const { jevApiKey } = await chrome.storage.local.get("jevApiKey");
-  if (!jevApiKey) fail("Add your Jev API key in PostLens settings, then retry.");
-  if (Date.now() < retryAfter) fail("Jev is busy or rate limited. Wait a minute, then retry.");
+async function requestJSON(endpoint, apiKey, payload, provider) {
+  if (Date.now() < (provider === "OpenAI" ? openaiRetryAfter : retryAfter)) fail(`${provider} is busy or rate limited. Wait a minute, then retry.`);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
   let body;
   try {
-    const response = await fetch(JEV_ENDPOINT, {
+    const response = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${jevApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ state, model: JEV_MODEL, questions: QUESTIONS }),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
       credentials: "omit", redirect: "error", signal: controller.signal
     });
     if (!response.ok) {
-      if ([401, 403].includes(response.status)) fail("Jev rejected the API key. Update it in PostLens settings.");
+      if ([401, 403].includes(response.status)) fail(`${provider} rejected the API key. Update it in PostLens settings.`);
       if ([429, 529].includes(response.status)) {
         const header = response.headers.get("Retry-After");
         const seconds = header === null ? NaN : Number(header);
         const until = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Date.parse(header);
-        retryAfter = Math.max(Date.now() + 60000, Number.isFinite(until) ? until : 0);
-        fail("Jev is busy or rate limited. Wait a minute, then retry.");
+        const next = Math.max(Date.now() + 60000, Number.isFinite(until) ? until : 0);
+        if (provider === "OpenAI") openaiRetryAfter = next;
+        else retryAfter = next;
+        fail(`${provider} is busy or rate limited. Wait a minute, then retry.`);
       }
-      fail(`Jev request failed (HTTP ${response.status}). Try again later.`);
+      fail(`${provider} request failed (HTTP ${response.status}). Try again later.`);
     }
     body = await response.json();
   } catch (error) {
     if (error instanceof UserError) throw error;
-    fail(controller.signal.aborted ? "Jev timed out. Retry when ready." : "Could not reach Jev or read its response. Check your connection and retry.");
+    fail(controller.signal.aborted ? `${provider} timed out. Retry when ready.` : `Could not reach ${provider} or read its response. Check your connection and retry.`);
   } finally {
     clearTimeout(timeout);
   }
+  return body;
+}
+
+async function analyze(state, key) {
+  const { jevApiKey } = await chrome.storage.local.get("jevApiKey");
+  if (!jevApiKey) fail("Add your Jev API key in PostLens settings, then retry.");
+  const body = await requestJSON(JEV_ENDPOINT, jevApiKey, { state, model: JEV_MODEL, questions: QUESTIONS }, "Jev");
   const result = { answers: normalizeAnswers(body), savedAt: Date.now() };
   try {
     await saveCache(key, result);
@@ -125,6 +134,69 @@ async function analyze(state, key) {
     return { ...result, cacheWarning: "Result could not be saved locally. Revisiting may require another analysis." };
   }
   return result;
+}
+
+async function guidanceSettings() {
+  const { timelineSettings } = await chrome.storage.local.get("timelineSettings");
+  return { goal: bounded(timelineSettings?.goal, 1000), enabled: timelineSettings?.enabled === true };
+}
+
+async function adviceKey(state, settings) {
+  // Goal/model/text changes cannot reuse advice for a different objective or post edit.
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([
+    GUIDANCE_VERSION, OPENAI_MODEL, settings.goal, state.post, state.author || {}
+  ])));
+  const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  return `${await cacheKey(state)}:advice:${hash}`;
+}
+
+async function buildAdvice(state, base, settings, key) {
+  const { openaiApiKey } = await chrome.storage.local.get("openaiApiKey");
+  const { jevApiKey } = await chrome.storage.local.get("jevApiKey");
+  if (!openaiApiKey) fail("Add your OpenAI API key in PostLens settings to get timeline advice.");
+  if (!jevApiKey) fail("Add your Jev API key in PostLens settings to get timeline advice.");
+  const response = await requestJSON(OPENAI_ENDPOINT, openaiApiKey, contextRequest(state, settings.goal), "OpenAI");
+  let context;
+  try {
+    context = parseContext(response);
+    // No credential ever appears in prompts; also reject unexpected echoed secrets.
+    if ([openaiApiKey, jevApiKey].some(secret => JSON.stringify(context).includes(secret))) throw Error("Secret echo");
+  } catch { fail("OpenAI could not produce usable context. Your original Jev scores are still available; retry advice when ready."); }
+  const body = await requestJSON(JEV_ENDPOINT, jevApiKey, {
+    model: JEV_MODEL, questions: GOAL_QUESTIONS,
+    state: {
+      ...state, timeline_goal: settings.goal, post_analysis: base.answers,
+      model_interpretation: { provenance: "OpenAI interpretation of visible text only; unverified, not independent evidence", ...context }
+    }
+  }, "Jev");
+  let advice;
+  try { advice = normalizeAdvice(body, context); }
+  catch { fail("Jev returned invalid timeline advice. Your original scores are still available; retry advice when ready."); }
+  try { await saveCache(key, { advice, savedAt: Date.now() }); }
+  catch { return { ...advice, cacheWarning: "Timeline advice could not be saved locally." }; }
+  return advice;
+}
+
+async function attachAdvice(state, base, readOnly) {
+  const settings = await guidanceSettings();
+  if (!settings.enabled || !settings.goal) return base;
+  const key = await adviceKey(state, settings);
+  const entry = (await chrome.storage.local.get(key))[key];
+  if (entry?.advice) {
+    try { return { ...base, adviceAvailable: true, advice: validateAdvice(entry.advice) }; }
+    catch { await chrome.storage.local.remove(key); }
+  }
+  if (readOnly) return { ...base, adviceAvailable: true };
+  try {
+    if (!pending.has(key)) pending.set(key, buildAdvice(state, base, settings, key).finally(() => pending.delete(key)));
+    const advice = await pending.get(key);
+    // Settings can change while a request is in flight. Never show the old goal's advice.
+    const latest = await guidanceSettings();
+    if (!latest.enabled || latest.goal !== settings.goal) return { ...base, adviceError: "Your timeline goal changed. Refresh this tab for current advice." };
+    return { ...base, adviceAvailable: true, advice };
+  } catch (error) {
+    return { ...base, adviceAvailable: true, adviceError: error instanceof UserError ? error.message : "Timeline advice is unavailable. Your original Jev scores are still available." };
+  }
 }
 
 function isPostSender(sender) {
@@ -139,16 +211,26 @@ export async function handleMessage(message, sender) {
   if (optionsSender) {
     if (message?.type === "SETTINGS_STATUS") {
       const data = await chrome.storage.local.get("jevApiKey");
-      return { ok: true, hasKey: Boolean(data.jevApiKey) };
+      const openai = await chrome.storage.local.get("openaiApiKey");
+      return { ok: true, hasKey: Boolean(data.jevApiKey), hasOpenAIKey: Boolean(openai.openaiApiKey), timeline: await guidanceSettings() };
     }
     if (message?.type === "SAVE_KEY") {
       const key = bounded(message.key, 4096);
       if (!key || /\s/.test(key)) fail("Enter a valid API key without whitespace.");
-      await chrome.storage.local.set({ jevApiKey: key });
+      if (message.provider && !["jev", "openai"].includes(message.provider)) fail("Unknown key provider.");
+      await chrome.storage.local.set({ [message.provider === "openai" ? "openaiApiKey" : "jevApiKey"]: key });
       return { ok: true };
     }
     if (message?.type === "REMOVE_KEY") {
-      await chrome.storage.local.remove("jevApiKey");
+      if (message.provider && !["jev", "openai"].includes(message.provider)) fail("Unknown key provider.");
+      await chrome.storage.local.remove(message.provider === "openai" ? "openaiApiKey" : "jevApiKey");
+      return { ok: true };
+    }
+    if (message?.type === "SAVE_TIMELINE") {
+      if (typeof message.goal !== "string" || message.goal.length > 1000 || typeof message.enabled !== "boolean") fail("Enter a timeline goal of at most 1,000 characters.");
+      const goal = message.goal.trim();
+      if (message.enabled && !goal) fail("Enter a timeline goal before enabling advice.");
+      await chrome.storage.local.set({ timelineSettings: { goal, enabled: message.enabled } });
       return { ok: true };
     }
     if (message?.type === "CLEAR_CACHE") {
@@ -168,15 +250,17 @@ export async function handleMessage(message, sender) {
   const key = await cacheKey(state);
   const cached = (await chrome.storage.local.get(key))[key];
   if (cached?.answers) {
-    try { return { ok: true, result: { answers: normalizeAnswers(cached), savedAt: cached.savedAt }, cached: true }; }
+    let result;
+    try { result = { answers: normalizeAnswers(cached), savedAt: cached.savedAt }; }
     catch { await chrome.storage.local.remove(key); }
+    if (result) return { ok: true, result: await attachAdvice(state, result, message.type === "GET_CACHED"), cached: true };
   }
   if (message.type === "GET_CACHED") return { ok: true, result: null };
   if (!pending.has(key)) {
     const task = analyze(state, key).finally(() => pending.delete(key));
     pending.set(key, task);
   }
-  return { ok: true, result: await pending.get(key), cached: false };
+  return { ok: true, result: await attachAdvice(state, await pending.get(key), false), cached: false };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

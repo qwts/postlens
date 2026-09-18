@@ -12,5 +12,5 @@ if (manifest.version_name) {
 assert.deepEqual(manifest.permissions, ["storage"]);
 for (const file of [manifest.background.service_worker, manifest.options_ui.page,
   ...manifest.content_scripts.flatMap(script => [...script.js, ...script.css])]) assert.ok(existsSync(file), file);
-for (const file of ["background.js", "content.js", "options.js", "questions.js"]) execFileSync(process.execPath, ["--check", file]);
+for (const file of ["background.js", "content.js", "options.js", "questions.js", "guidance.js"]) execFileSync(process.execPath, ["--check", file]);
 console.log("Manifest, versions, extension files, and JavaScript syntax verified.");

@@ -98,9 +98,52 @@
     details.append(list);
     details.append(element("p", "postlens-type", `Type: ${result.answers.post_type.choice}`));
     details.append(element("p", "postlens-note", "Visible text only; no external fact-check. Automation signals do not prove an account is a bot. Account context uses limited visible metadata."));
+    if (result.advice) {
+      const advice = result.advice;
+      const section = element("section", "postlens-advice");
+      section.append(element("strong", "", "Your timeline goal"));
+      section.append(element("p", "", `Goal fit: ${advice.alignment.toFixed(2)} / 4 · ${Math.round(advice.alignmentConfidence * 100)}% confidence`));
+      const names = { skip: "Skip", like: "Consider liking", like_follow: "Consider like + follow", mute: "Consider mute", review: "Review before acting" };
+      section.append(element("p", "postlens-suggestion", `Suggested: ${names[advice.action]} · ${Math.round(advice.actionConfidence * 100)}% Jev confidence`));
+      section.append(element("p", "", advice.context.goal_relation));
+      const context = element("details", "postlens-context");
+      context.append(element("summary", "", "Why this may fit · GPT-5.6 Luna"));
+      context.append(element("p", "", advice.context.summary));
+      if (advice.context.topics.length) context.append(element("p", "", `Topics: ${advice.context.topics.join(", ")}`));
+      context.append(element("p", "", `Potential value: ${advice.context.potential_value}`));
+      context.append(element("p", "", `Potential downside: ${advice.context.potential_downside}`));
+      if (advice.context.uncertainties.length) {
+        const list = element("ul", "");
+        for (const uncertainty of advice.context.uncertainties) list.append(element("li", "", uncertainty));
+        context.append(list);
+      }
+      section.append(context);
+      if (advice.cautionApplied) section.append(element("p", "postlens-note", "Low confidence or weak goal fit: review is shown instead of a stronger action."));
+      const guidance = {
+        skip: "No action needed. Keep scrolling.",
+        like: "If you agree after reviewing the post, use X's Like button.",
+        like_follow: "Review the author's other posts first. If they consistently help your goal, use X's Like and Follow controls.",
+        mute: "Review the author's profile first. If you want to exclude the account, use X's post/profile menu → Mute. One post may not represent the account.",
+        review: "Read the post, check its sources, and review the author's profile before deciding."
+      };
+      section.append(element("p", "", guidance[advice.action]));
+      const handle = record.state.author?.handle;
+      if (advice.action !== "skip" && /^@[A-Za-z0-9_]{1,15}$/.test(handle || "")) {
+        const link = element("a", "postlens-profile", `Review ${handle} on X`);
+        link.href = `https://x.com/${handle.slice(1)}`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        section.append(link);
+      }
+      section.append(element("p", "postlens-note", "AI interpretation of visible text, not independent evidence. You choose actions on X; ranking changes are not guaranteed."));
+      if (advice.cacheWarning) section.append(element("p", "postlens-note", advice.cacheWarning));
+      details.append(section);
+    }
+    if (result.adviceError) details.append(element("p", "postlens-note", result.adviceError));
     if (result.cacheWarning) details.append(element("p", "postlens-note", result.cacheWarning));
     record.output.replaceChildren(details);
-    record.button.hidden = true;
+    record.button.hidden = !result.adviceAvailable || Boolean(result.advice);
+    if (!record.button.hidden) record.button.textContent = result.adviceError ? "Retry timeline advice" : "Analyze for my goal";
   }
 
   function enhance(article) {
@@ -128,7 +171,7 @@
     const actions = own(article, '[role="group"]').find(node => node.querySelector('[data-testid="reply"]'));
     const mount = actions?.parentElement || textNode?.parentElement || article.lastElementChild || article;
     mount.append(root);
-    const record = { identity: signature, root, button, output, busy: false };
+    const record = { identity: signature, state, root, button, output, busy: false, started: false };
     records.set(article, record);
     settings.addEventListener("click", async () => {
       const reply = await send({ type: "OPEN_OPTIONS" });
@@ -143,6 +186,7 @@
       if (!event.isTrusted || record.busy) return;
       if (!current(article, record)) { enhance(article); return; }
       record.busy = true;
+      record.started = true;
       button.disabled = true;
       button.textContent = "JEV Analyzing…";
       root.setAttribute("aria-busy", "true");
@@ -160,7 +204,7 @@
     });
     // Cache reads never call Jev, and do not require credentials.
     send({ type: "GET_CACHED", state }).then(reply => {
-      if (current(article, record) && !record.busy && !button.hidden && reply?.ok && reply.result) renderResult(record, reply.result, true);
+      if (current(article, record) && !record.started && !record.busy && !button.hidden && reply?.ok && reply.result) renderResult(record, reply.result, true);
     });
   }
 

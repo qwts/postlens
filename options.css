@@ -3,6 +3,11 @@ body { margin: 40px auto; max-width: 580px; padding: 0 24px; }
 h1 { font-size: 28px; }
 label { display: block; font-weight: 600; }
 input { display: block; width: 100%; box-sizing: border-box; margin: 8px 0; padding: 10px; font: inherit; }
+textarea { display: block; width: 100%; box-sizing: border-box; margin: 8px 0; padding: 10px; font: inherit; resize: vertical; }
+.checkbox { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.checkbox input { width: auto; margin: 0; }
+form { margin-bottom: 24px; }
+h2 { font-size: 21px; margin-top: 28px; }
 button { font: inherit; padding: 6px 14px; margin: 4px 8px 4px 0; cursor: pointer; }
 a { color: light-dark(#075aa5, #8bc7ff); }
 #status { min-height: 24px; font-weight: 600; }

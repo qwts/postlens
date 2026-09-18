@@ -5,7 +5,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parent.parent
-FILES = ["manifest.json", "background.js", "questions.js", "content.js", "content.css",
+FILES = ["manifest.json", "background.js", "questions.js", "guidance.js", "content.js", "content.css",
          "options.html", "options.js", "options.css", "README.md"]
 manifest = json.loads((ROOT / "manifest.json").read_text())
 version = manifest.get("version_name", manifest["version"])
